@@ -11,13 +11,6 @@ services:
         BUILD_IMAGE: ${SOLUTION_BUILD_IMAGE}
         BUILD_CONFIGURATION: ${BUILD_CONFIGURATION}
     scale: 0
-
-  traefik:
-    volumes:
-      - ./docker/traefik:C:/etc/traefik
-    depends_on:
-      hrz:
-        condition: service_healthy  
   
   redis:
     image: ${REGISTRY}${COMPOSE_PROJECT_NAME}-redis:${VERSION:-latest}
@@ -25,11 +18,6 @@ services:
       context: ./docker/build/redis
       args:
         BASE_IMAGE: ${SITECORE_DOCKER_REGISTRY}sitecore-redis:${SITECORE_VERSION}
-
-  mssql:
-    mem_limit: 2GB
-    volumes:
-      - ${LOCAL_DATA_PATH}\mssql:c:\data
 
   mssql-init:
     image: ${REGISTRY}${COMPOSE_PROJECT_NAME}-xp1-mssql-init:${VERSION:-latest}
@@ -40,9 +28,6 @@ services:
         SPE_IMAGE: ${SITECORE_MODULE_REGISTRY}sitecore-spe-assets:${SPE_VERSION}
   
   # Mount our Solr data folder
-  solr:
-    volumes:
-      - ${LOCAL_DATA_PATH}\solr:c:\data
 
   # Some modules (like SXA) also require additions to the Solr image.
   solr-init:
@@ -198,37 +183,3 @@ services:
         SOLUTION_IMAGE: ${REGISTRY}${COMPOSE_PROJECT_NAME}-solution:${VERSION:-latest}
     depends_on:
       - solution
-
-  hrz:
-    image: ${SITECORE_MODULE_REGISTRY}sitecore-horizon:${HORIZON_VERSION}
-    isolation: ${ISOLATION}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/healthz/live"]
-      timeout: 300s
-    environment:
-      Sitecore_License: ${SITECORE_LICENSE}
-      Sitecore_FederatedUI__HostBaseUrl: http://hrz
-      Sitecore_SitecorePlatform__ContentManagementUrl: https://${CM_HOST}
-      Sitecore_SitecorePlatform__ContentManagementInternalUrl: http://cm
-      Sitecore_Sitecore__Authentication__OpenIdConnectOptions__RequireHttpsMetadata: 'false'
-      Sitecore_Sitecore__Authentication__OpenIdConnectOptions__Authority: https://${ID_HOST}
-      Sitecore_Sitecore__Authentication__OpenIdConnectOptions__CallbackAuthority: https://${HRZ_HOST}
-      Sitecore_Sitecore__Authentication__OpenIdConnectOptions__InternalAuthority: http://id
-      Sitecore_Sitecore__Authentication__BearerAuthenticationOptions__Authority: https://${ID_HOST}
-      Sitecore_Sitecore__Authentication__BearerAuthenticationOptions__InternalAuthority: http://id
-      Sitecore_Sitecore__Authentication__BearerAuthenticationOptions__RequireHttpsMetadata: 'false'
-      Sitecore_Plugins__Filters__ExperienceAccelerator: +SXA
-    depends_on:
-      id:
-        condition: service_started
-      cm:
-        condition: service_started
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.middlewares.force-STS-Header.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.force-STS-Header.headers.stsSeconds=31536000"
-      - "traefik.http.routers.sh-secure.entrypoints=websecure"
-      - "traefik.http.routers.sh-secure.rule=Host(`${HRZ_HOST}`)"
-      - "traefik.http.routers.sh-secure.tls=true"
-      - "traefik.http.routers.sh-secure.middlewares=force-STS-Header"
-      - "traefik.http.services.sh.loadbalancer.server.port=80"
